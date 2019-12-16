@@ -7,12 +7,12 @@ mod msg_stream_channel;
 use std::{env, path::PathBuf};
 
 use fern::colors::{Color, ColoredLevelConfig};
-use flutter_glfw::window::{FlutterWindow, WindowArgs, WindowMode};
-use flutter_plugins::{dialog, settings};
 use log::info;
 
 #[cfg(target_os = "macos")]
 use core_foundation::bundle;
+use flutter_glfw::window::{WindowArgs, WindowMode};
+use flutter_plugins::settings::PlatformBrightness;
 
 #[cfg(target_os = "macos")]
 fn get_res_dir() -> PathBuf {
@@ -76,52 +76,41 @@ fn main() {
         }
     };
 
-    let mut engine = flutter_glfw::init().unwrap();
-    let window = engine
-        .create_window(
-            &WindowArgs {
-                height: 1200,
-                width: 1800,
-                title: "Flutter App Demo",
-                mode: WindowMode::Windowed,
-                bg_color: (255, 255, 255),
-            },
-        )
+    let mut desktop = flutter_glfw::init().unwrap();
+    let window = desktop
+        .create_window(&WindowArgs {
+            height: 1200,
+            width: 1800,
+            title: "Flutter App Demo",
+            mode: WindowMode::Windowed,
+            bg_color: (255, 255, 255),
+        })
         .unwrap();
+
     window
         .add_plugin(calc_channel::CalcPlugin::default())
-        .add_plugin(dialog::DialogPlugin::default())
-        .add_plugin(msg_stream_channel::MsgStreamPlugin::default())
-        //.add_plugin(window::WindowPlugin::default())
-        .with_plugin(|p: &settings::SettingsPlugin| {
-            p.start_message()
-                .set_text_scale_factor(1.0)
-                .set_platform_brightness(
-                    settings::PlatformBrightness::Dark,
-                )
-                .send();
-        });
-    window.run(
-        assets_path.to_str().unwrap().to_string(),
-        icu_data_path.to_str().unwrap().to_string(),
-        vec![],
-        None, //Some(&mut glfw_event_handler),
-        None,
-    ).unwrap();
-}
+        .add_plugin(msg_stream_channel::MsgStreamPlugin::default());
 
-/*fn glfw_event_handler(window_state: &FlutterWindow, event: glfw::WindowEvent) -> bool {
-    match event {
-        glfw::WindowEvent::CursorPos(x, y) => {
-            let dragging = window_state.with_window_and_plugin_mut_result(
-                |window, p: &mut window::WindowPlugin| p.drag_window(window, x, y),
-            );
-            if let Some(dragging) = dragging {
-                !dragging
-            } else {
-                true
-            }
-        }
-        _ => true,
-    }
-}*/
+    window
+        .post_main_thread_callback(|w| {
+            w.with_plugin(|p: &flutter_plugins::settings::SettingsPlugin| {
+                p.start_message()
+                    .set_text_scale_factor(1.0)
+                    .set_platform_brightness(PlatformBrightness::Dark)
+                    .send();
+            });
+        })
+        .unwrap();
+
+    window
+        .run(
+            assets_path.to_string_lossy().to_string(),
+            icu_data_path.to_string_lossy().to_string(),
+            vec![],
+            None,
+            None,
+        )
+        .unwrap();
+
+    window.shutdown();
+}
